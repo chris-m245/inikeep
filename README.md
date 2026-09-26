@@ -58,6 +58,18 @@ format = json
 The comment, the blank line, and the untouched `host` line come through
 unchanged.
 
+Inline comments after a value are split out, not treated as part of it:
+
+```python
+doc = IniDocument.parse("[server]\nport = 8080 ; default, override in prod\n")
+doc.get("server", "port")   # "8080"
+doc.set("server", "port", "9090")
+print(doc)   # port = 9090 ; default, override in prod
+```
+
+The comment char only starts a comment when it's preceded by whitespace,
+so a value like a URL containing `#` isn't mistaken for one.
+
 Reading and writing files directly:
 
 ```python
@@ -72,8 +84,6 @@ doc.save("app.ini")
   string, same as raw text in the file.
 - No `%(interpolation)s` support.
 - Duplicate keys within a section: `get()` returns the first match.
-- Inline comments after a value (`key = value ; note`) are kept as part
-  of the value rather than split out.
 
 ## Install
 

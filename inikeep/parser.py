@@ -26,6 +26,19 @@ class IniError(Exception):
     """Raised when a document cannot be parsed or an edit is invalid."""
 
 
+def _split_inline_comment(value: str) -> tuple[str, Optional[str]]:
+    """Split "8080 ; note" into ("8080", "; note").
+
+    A comment char only starts an inline comment if it's preceded by
+    whitespace, so it doesn't misfire on values like a URL fragment
+    (`http://example.com/#frag`) that just happen to contain '#'.
+    """
+    for i, ch in enumerate(value):
+        if i > 0 and ch in _COMMENT_CHARS and value[i - 1].isspace():
+            return value[:i].rstrip(), value[i:]
+    return value.rstrip(), None
+
+
 @dataclass
 class _Line:
     raw: str
@@ -35,6 +48,7 @@ class _Line:
     sep: str = "="
     value: Optional[str] = None
     indent: str = ""
+    inline_comment: Optional[str] = None
 
 
 class IniDocument:
@@ -70,6 +84,7 @@ class IniDocument:
             match = _ENTRY_RE.match(raw)
             if not match:
                 raise IniError(f"could not parse line: {raw!r}")
+            value, inline_comment = _split_inline_comment(match.group("value"))
             doc._lines.append(
                 _Line(
                     raw,
@@ -77,8 +92,9 @@ class IniDocument:
                     section=section,
                     key=match.group("key"),
                     sep=match.group("sep"),
-                    value=match.group("value"),
+                    value=value,
                     indent=match.group("indent"),
+                    inline_comment=inline_comment,
                 )
             )
         return doc
@@ -121,7 +137,13 @@ class IniDocument:
         for line in self._lines:
             if line.kind == "entry" and line.section == section and line.key == key:
                 line.value = value
-                line.raw = f"{line.indent}{line.key} {line.sep} {value}"
+                if line.inline_comment:
+                    line.raw = (
+                        f"{line.indent}{line.key} {line.sep} {value} "
+                        f"{line.inline_comment}"
+                    )
+                else:
+                    line.raw = f"{line.indent}{line.key} {line.sep} {value}"
                 return
         self._append_entry(section, key, value)
 

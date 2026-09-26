@@ -42,3 +42,32 @@ def test_comments_and_blank_lines_survive_edits():
     text = str(doc)
     assert "; keep me" in text
     assert "\n\n" in text
+
+
+def test_inline_comment_is_split_from_value():
+    doc = IniDocument.parse("[server]\nport = 8080 ; default, override in prod\n")
+    assert doc.get("server", "port") == "8080"
+
+
+def test_inline_comment_with_hash():
+    doc = IniDocument.parse("[a]\nx = 1 # trailing note\n")
+    assert doc.get("a", "x") == "1"
+
+
+def test_unchanged_inline_comment_line_round_trips_exactly():
+    text = "[server]\nport = 8080 ; default, override in prod\n"
+    doc = IniDocument.parse(text)
+    assert str(doc) == text
+
+
+def test_set_preserves_inline_comment():
+    doc = IniDocument.parse("[server]\nport = 8080 ; default, override in prod\n")
+    doc.set("server", "port", "9090")
+    text = str(doc)
+    assert "port = 9090 ; default, override in prod" in text
+    assert doc.get("server", "port") == "9090"
+
+
+def test_comment_char_without_leading_space_is_kept_in_value():
+    doc = IniDocument.parse("[a]\nurl = http://example.com/#frag\n")
+    assert doc.get("a", "url") == "http://example.com/#frag"
