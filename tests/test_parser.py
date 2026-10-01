@@ -1,3 +1,5 @@
+import pytest
+
 from inikeep import IniDocument
 
 
@@ -71,3 +73,55 @@ def test_set_preserves_inline_comment():
 def test_comment_char_without_leading_space_is_kept_in_value():
     doc = IniDocument.parse("[a]\nurl = http://example.com/#frag\n")
     assert doc.get("a", "url") == "http://example.com/#frag"
+
+
+def test_getint():
+    doc = IniDocument.parse("[a]\nport = 8080 ; note\nneg = -3\n")
+    assert doc.getint("a", "port") == 8080
+    assert doc.getint("a", "neg") == -3
+
+
+def test_getint_missing_returns_fallback():
+    doc = IniDocument.parse("[a]\nx = 1\n")
+    assert doc.getint("a", "y") is None
+    assert doc.getint("a", "y", fallback=7) == 7
+    assert doc.getint("nope", "y", fallback=0) == 0
+
+
+def test_getint_invalid_raises():
+    doc = IniDocument.parse("[a]\nx = abc\n")
+    with pytest.raises(ValueError, match="not an integer"):
+        doc.getint("a", "x")
+
+
+def test_getfloat():
+    doc = IniDocument.parse("[a]\nt = 2.5\nn = 3\n")
+    assert doc.getfloat("a", "t") == 2.5
+    assert doc.getfloat("a", "n") == 3.0
+    assert doc.getfloat("a", "missing", fallback=1.5) == 1.5
+
+
+def test_getfloat_invalid_raises():
+    doc = IniDocument.parse("[a]\nt = fast\n")
+    with pytest.raises(ValueError, match="not a float"):
+        doc.getfloat("a", "t")
+
+
+@pytest.mark.parametrize("word", ["1", "yes", "True", "ON", "Yes"])
+def test_getboolean_true_words(word):
+    doc = IniDocument.parse(f"[a]\nflag = {word}\n")
+    assert doc.getboolean("a", "flag") is True
+
+
+@pytest.mark.parametrize("word", ["0", "no", "False", "OFF", "No"])
+def test_getboolean_false_words(word):
+    doc = IniDocument.parse(f"[a]\nflag = {word}\n")
+    assert doc.getboolean("a", "flag") is False
+
+
+def test_getboolean_missing_and_invalid():
+    doc = IniDocument.parse("[a]\nflag = maybe\n")
+    assert doc.getboolean("a", "other") is None
+    assert doc.getboolean("a", "other", fallback=True) is True
+    with pytest.raises(ValueError, match="not a boolean"):
+        doc.getboolean("a", "flag")

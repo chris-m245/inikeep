@@ -17,6 +17,8 @@ from typing import Iterator, Optional, Union
 
 _SECTION_RE = re.compile(r"^\[(?P<name>.+)\]\s*$")
 _COMMENT_CHARS = (";", "#")
+_TRUE_WORDS = frozenset({"1", "yes", "true", "on"})
+_FALSE_WORDS = frozenset({"0", "no", "false", "off"})
 _ENTRY_RE = re.compile(
     r"^(?P<indent>\s*)(?P<key>[^=:\s][^=:]*?)\s*(?P<sep>[=:])\s*(?P<value>.*)$"
 )
@@ -130,6 +132,39 @@ class IniDocument:
             if line.kind == "entry" and line.section == section and line.key == key:
                 return line.value
         return fallback
+
+    def getint(self, section: str, key: str, fallback=None):
+        value = self.get(section, key)
+        if value is None:
+            return fallback
+        try:
+            return int(value)
+        except ValueError:
+            raise ValueError(
+                f"[{section}] {key}: not an integer: {value!r}"
+            ) from None
+
+    def getfloat(self, section: str, key: str, fallback=None):
+        value = self.get(section, key)
+        if value is None:
+            return fallback
+        try:
+            return float(value)
+        except ValueError:
+            raise ValueError(f"[{section}] {key}: not a float: {value!r}") from None
+
+    def getboolean(self, section: str, key: str, fallback=None):
+        value = self.get(section, key)
+        if value is None:
+            return fallback
+        # Same spellings configparser accepts, so files that work with one
+        # work with the other.
+        lowered = value.lower()
+        if lowered in _TRUE_WORDS:
+            return True
+        if lowered in _FALSE_WORDS:
+            return False
+        raise ValueError(f"[{section}] {key}: not a boolean: {value!r}")
 
     # -- writing -----------------------------------------------------------
 

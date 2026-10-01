@@ -70,6 +70,18 @@ print(doc)   # port = 9090 ; default, override in prod
 The comment char only starts a comment when it's preceded by whitespace,
 so a value like a URL containing `#` isn't mistaken for one.
 
+Typed accessors take the same `fallback` argument as `get()`. A missing key
+returns the fallback; a value that can't be converted raises `ValueError`.
+`getboolean` accepts `1/yes/true/on` and `0/no/false/off`, any case, the
+same as `configparser`.
+
+```python
+doc = IniDocument.parse("[server]\nport = 8080\ndebug = Yes\n")
+doc.getint("server", "port")                  # 8080
+doc.getboolean("server", "debug")             # True
+doc.getfloat("server", "timeout", fallback=2.5)  # 2.5
+```
+
 Reading and writing files directly:
 
 ```python
@@ -80,8 +92,8 @@ doc.save("app.ini")
 
 ## What it does not do (yet)
 
-- No value type coercion (`getint`, `getboolean`, etc.) — everything is a
-  string, same as raw text in the file.
+- `get()` and `set()` deal in strings only; use `getint`, `getfloat` and
+  `getboolean` to convert on read.
 - No `%(interpolation)s` support.
 - Duplicate keys within a section: `get()` returns the first match.
 
